@@ -3,6 +3,7 @@ import requests
 import pydantic
 import datetime
 import random
+from notion2md.exporter.block import StringExporter
 
 
 def fetch_notion_data():
@@ -16,12 +17,16 @@ def fetch_notion_data():
     }
 
     start_iso = (
-        datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
+        datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=365)
     ).isoformat()
 
     payload = {
         "filter": {
             "and": [
+                {
+                    "property": "サマリ不要",
+                    "checkbox": {"equals": False},
+                },
                 {
                     "timestamp": "created_time",
                     "created_time": {"on_or_after": start_iso},
@@ -68,7 +73,6 @@ def select_notion_data(notion_data_list: list[NotionData]) -> NotionData:
     now = datetime.datetime.now(datetime.timezone.utc)
     yesterday = now - datetime.timedelta(days=1)
     week_ago = now - datetime.timedelta(days=7)
-    month_ago = now - datetime.timedelta(days=30)
 
     # 期間ごとにデータを振り分け
     yesterday_data = []
@@ -80,7 +84,7 @@ def select_notion_data(notion_data_list: list[NotionData]) -> NotionData:
             yesterday_data.append(data)
         elif data.created_time >= week_ago:
             week_data.append(data)
-        elif data.created_time >= month_ago:
+        else:
             month_data.append(data)
 
     # 確率に基づいて期間を選択
@@ -103,91 +107,25 @@ def select_notion_data(notion_data_list: list[NotionData]) -> NotionData:
     return selected_data
 
 
-def fetch_notion_page(id: str) -> dict:
-    NOTION_API_KEY = os.environ["NOTION_API_KEY"]
-
-    headers = {
-        "Authorization": f"Bearer {NOTION_API_KEY}",
-        "Notion-Version": "2022-06-28",
-    }
-
-    url = f"https://api.notion.com/v1/blocks/{id}/children"
-    response = requests.get(url, headers=headers)
-
-    if response.status_code == 200:
-        print(response.json())
-        return response.json()
-    else:
-        raise Exception(
-            f"status_code: {response.status_code}, message: {response.text}"
-        )
-
-
-# class NotionPage(pydantic.BaseModel):
-#     content: list[NotionBlock]
-
-
-class NotionBlock(pydantic.BaseModel):
-    type: str
-    plain_text: str
-
-
-def convert_to_notion_blocks(data: dict) -> list[NotionBlock]:
-    blocks = []
-    for block in data["results"]:
-        print("--------------------------------")
-        print(block)
-        block_type = block["type"]
-        plain_text = ""
-        if block_type in block and "rich_text" in block[block_type]:
-            rich_text = block[block_type]["rich_text"]
-            for text in rich_text:
-                if "text" in text and "content" in text["text"]:
-                    plain_text += text["text"]["content"]
-        blocks.append(NotionBlock(type=block_type, plain_text=plain_text))
-    return blocks
-
-
-def convert_to_markdown(blocks: list[NotionBlock]) -> str:
-    markdown = ""
-    for block in blocks:
-        if block.type == "heading_1":
-            markdown += f"\n# {block.plain_text}\n"
-        elif block.type == "heading_2":
-            markdown += f"\n## {block.plain_text}\n"
-        elif block.type == "heading_3":
-            markdown += f"\n### {block.plain_text}\n"
-        elif block.type == "bulleted_list_item":
-            markdown += f"- {block.plain_text}\n"
-        elif block.type == "numbered_list_item":
-            markdown += f"1. {block.plain_text}\n"
-        elif block.type == "divider":
-            markdown += "\n---\n\n"
-        elif block.type == "quote":
-            markdown += f"> {block.plain_text}\n"
-        else:
-            markdown += f"{block.plain_text}\n"
-    return markdown
-
-
 # TODO
 # - [x] NotionからDBのデータを取得する
 # - [x] ページを一つ抽選する
-# - [ ] ページの内容を取得する
+# - [x] ページの内容を取得する
 # - [ ] ページの内容を要約して投稿内容にする
 # - [ ] 投稿内容をJudgeする
 # - [ ] 投稿内容を投稿する
 
+# Refactor
+# - [ ] 固定値やマジックナンバーを定数にする
+
 
 def main():
-    # data = fetch_notion_data()
-    # notion_data_list = convert_to_notion_data(data)
+    data = fetch_notion_data()
+    notion_data_list = convert_to_notion_data(data)
+    selected_data = select_notion_data(notion_data_list)
 
-    # selected_data = select_notion_data(notion_data_list)
-    page = fetch_notion_page("1491137e613880698e94f273f43e042b")  # selected_data.id)
-    # notion_page = convert_to_notion_page(page)
-    blocks = convert_to_notion_blocks(page)
-    markdown = convert_to_markdown(blocks)
+    os.environ["NOTION_TOKEN"] = os.environ["NOTION_API_KEY"]
+    markdown = StringExporter(block_id=selected_data.id).export()
     print(markdown)
 
 

@@ -8,6 +8,7 @@ langchain = "*"
 langchain-openai = "*"
 langgraph = "*"
 pydantic = "*"
+notion2md = "*"
 
 [dev-packages]
 
