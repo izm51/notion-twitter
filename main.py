@@ -39,12 +39,13 @@ def fetch_notion_data():
         data = response.json()
         return data
     else:
-        raise StandardError(
+        raise Exception(
             f"status_code: {response.status_code}, message: {response.text}"
         )
 
 
 class NotionData(pydantic.BaseModel):
+    id: str
     title: str
     created_time: datetime.datetime
 
@@ -52,11 +53,12 @@ class NotionData(pydantic.BaseModel):
 def convert_to_notion_data(data: dict) -> list[NotionData]:
     notion_data_list = []
     for page in data["results"]:
+        id = page["id"]
         title = page["properties"]["名前"]["title"][0]["text"]["content"]
         created_time = datetime.datetime.fromisoformat(
             page["created_time"].replace("Z", "+00:00")
         )
-        notion_data = NotionData(title=title, created_time=created_time)
+        notion_data = NotionData(id=id, title=title, created_time=created_time)
         notion_data_list.append(notion_data)
     return notion_data_list
 
@@ -101,6 +103,73 @@ def select_notion_data(notion_data_list: list[NotionData]) -> NotionData:
     return selected_data
 
 
+def fetch_notion_page(id: str) -> dict:
+    NOTION_API_KEY = os.environ["NOTION_API_KEY"]
+
+    headers = {
+        "Authorization": f"Bearer {NOTION_API_KEY}",
+        "Notion-Version": "2022-06-28",
+    }
+
+    url = f"https://api.notion.com/v1/blocks/{id}/children"
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        print(response.json())
+        return response.json()
+    else:
+        raise Exception(
+            f"status_code: {response.status_code}, message: {response.text}"
+        )
+
+
+# class NotionPage(pydantic.BaseModel):
+#     content: list[NotionBlock]
+
+
+class NotionBlock(pydantic.BaseModel):
+    type: str
+    plain_text: str
+
+
+def convert_to_notion_blocks(data: dict) -> list[NotionBlock]:
+    blocks = []
+    for block in data["results"]:
+        print("--------------------------------")
+        print(block)
+        block_type = block["type"]
+        plain_text = ""
+        if block_type in block and "rich_text" in block[block_type]:
+            rich_text = block[block_type]["rich_text"]
+            for text in rich_text:
+                if "text" in text and "content" in text["text"]:
+                    plain_text += text["text"]["content"]
+        blocks.append(NotionBlock(type=block_type, plain_text=plain_text))
+    return blocks
+
+
+def convert_to_markdown(blocks: list[NotionBlock]) -> str:
+    markdown = ""
+    for block in blocks:
+        if block.type == "heading_1":
+            markdown += f"\n# {block.plain_text}\n"
+        elif block.type == "heading_2":
+            markdown += f"\n## {block.plain_text}\n"
+        elif block.type == "heading_3":
+            markdown += f"\n### {block.plain_text}\n"
+        elif block.type == "bulleted_list_item":
+            markdown += f"- {block.plain_text}\n"
+        elif block.type == "numbered_list_item":
+            markdown += f"1. {block.plain_text}\n"
+        elif block.type == "divider":
+            markdown += "\n---\n\n"
+        elif block.type == "quote":
+            markdown += f"> {block.plain_text}\n"
+        else:
+            markdown += f"{block.plain_text}\n"
+    return markdown
+
+
 # TODO
 # - [x] NotionからDBのデータを取得する
 # - [x] ページを一つ抽選する
@@ -111,17 +180,15 @@ def select_notion_data(notion_data_list: list[NotionData]) -> NotionData:
 
 
 def main():
-    data = fetch_notion_data()
-    notion_data_list = convert_to_notion_data(data)
+    # data = fetch_notion_data()
+    # notion_data_list = convert_to_notion_data(data)
 
-    # for notion_data in notion_data_list:
-    #     print(f"タイトル: {notion_data.title}")
-    #     print(f"作成日時: {notion_data.created_time}")
-    #     print("---")
-
-    selected_data = select_notion_data(notion_data_list)
-    print(f"タイトル: {selected_data.title}")
-    print(f"作成日時: {selected_data.created_time}")
+    # selected_data = select_notion_data(notion_data_list)
+    page = fetch_notion_page("1491137e613880698e94f273f43e042b")  # selected_data.id)
+    # notion_page = convert_to_notion_page(page)
+    blocks = convert_to_notion_blocks(page)
+    markdown = convert_to_markdown(blocks)
+    print(markdown)
 
 
 if __name__ == "__main__":
