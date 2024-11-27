@@ -11,7 +11,7 @@ pipenv install [package-name]
 update requirements.txt
 
 ```bash
-pipenv requirements > requirements.txt
+pipenv requirements >| requirements.txt
 ```
 
 **run main.py in pipenv**
