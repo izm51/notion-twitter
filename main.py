@@ -1,11 +1,12 @@
+from langchain_handler import LangChainHandler
 from notion_handler import NotionHandler
 
 # TODO
 # - [x] NotionからDBのデータを取得する
 # - [x] ページを一つ抽選する
 # - [x] ページの内容を取得する
-# - [ ] ページの内容を要約して投稿内容にする
-# - [ ] 投稿内容をJudgeする
+# - [x] ページの内容を要約して投稿内容にする
+# - [x] 投稿内容をJudgeする
 # - [ ] 投稿内容を投稿する
 
 # Refactor
@@ -18,7 +19,11 @@ def main():
     notion_data_list = client.convert_to_notion_data(data)
     selected_data = client.select_notion_data(notion_data_list)
     markdown = client.get_page_content(selected_data.id)
-    print(markdown)
+    # print(markdown)
+
+    langchain_client = LangChainHandler()
+    post = langchain_client.run_workflow(markdown)
+    print(post)
 
 
 if __name__ == "__main__":
