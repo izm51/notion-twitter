@@ -32,25 +32,43 @@ class Judgement(BaseModel):
     reason: str = Field(default="", description="判定理由")
 
 
+class LangChainConfig:
+    MODEL_NAME = "gpt-4o-mini"
+    TEMPERATURE = 0.5
+    BLOCK_MIN_CHARS = 300
+    BLOCK_MAX_CHARS = 600
+    POST_MIN_CHARS = 120
+    POST_MAX_CHARS = 140
+    MAX_TRIALS = 3
+
+
 class LangChainHandler:
     def __init__(self):
         logger.info("Initializing LangChainHandler")
         os.environ["LANGCHAIN_TRACING_V2"] = "true"
         os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
         os.environ["LANGCHAIN_PROJECT"] = "pr-charming-fiesta-52"
-        self.model = ChatOpenAI(model="gpt-4o-mini", temperature=0.5)
+        self.model = ChatOpenAI(
+            model=LangChainConfig.MODEL_NAME, temperature=LangChainConfig.TEMPERATURE
+        )
 
     def block_selection_node(self, state: State) -> dict[str, Any]:
         logger.info("Starting block selection")
         prompt = ChatPromptTemplate.from_template(
-            """次の文章を300文字から600文字程度ずつのブロックに分割し、その中からランダムに1ブロックを抜き出してください。
+            """次の文章を{min_chars}文字から{max_chars}文字程度ずつのブロックに分割し、その中からランダムに1ブロックを抜き出してください。
 
 文章:
 {content}
 """
         )
         chain = prompt | self.model | StrOutputParser()
-        chunk = chain.invoke({"content": state.content})
+        chunk = chain.invoke(
+            {
+                "content": state.content,
+                "min_chars": LangChainConfig.BLOCK_MIN_CHARS,
+                "max_chars": LangChainConfig.BLOCK_MAX_CHARS,
+            }
+        )
         logger.debug(f"Selected block: {chunk[:100]}...")
         return {"chunks": [chunk]}
 
@@ -58,8 +76,8 @@ class LangChainHandler:
         logger.info(f"Generating post (trial #{state.trial_count + 1})")
         prompt = ChatPromptTemplate.from_template(
             """指示：
-以下に提供する文章を、SNSに投稿するための読み応えがあり、全角120文字以上140文字以内の文章に仕上げてください。
-提供された文章から120文字以上のコンテンツを生成できない場合のみ、独自にコンテンツを生成してください。
+以下に提供する文章を、SNSに投稿するための読み応えがあり、全角{min_chars}文字以上{max_chars}文字以内の文章に仕上げてください。
+提供された文章から{min_chars}文字以上のコンテンツを生成できない場合のみ、独自にコンテンツを生成してください。
 
 文体・トーン：
 ・文体: 威厳がありつつもカジュアルで口語的。話し言葉を多用し、読者に直接語りかける形式。
@@ -69,40 +87,41 @@ class LangChainHandler:
 ・禁止事項: 文末にビックリマークなどカジュアルすぎる表現を避ける。ハッシュタグの使用は禁止。
 
 チェックポイント：
-・文章が120文字以上140文字以内であること。
+・文章が{min_chars}文字以上{max_chars}文字以内であること。
 ・読み応えがあり、内容が充実していること。
-
-例：
-・リスクが怖くて動けない人、それが最大のリスクだということに気づいて。大企業でサラリーマンやってるのが本当に安全だと思うか。リストラされたら一発で無職ですよ。そんな人が再就職しようとしても、なんとなく雇われてたやつは仕事がなくて困るんだわ。自分に実力をつけるのが最大のリスクヘッジだよ。
-・優秀な経営者は「自分」ではなく「組織」を優秀にするけど、これは社員も同じ。「俺にしかできない/俺が抜けたら回らない」という人は二流で「誰でもできる仕事に変える人」が一流。知識/技術/タスクの独占が評価されることはない。仕事で評価を得る人とは、自分がいなくても回る仕組みを作る人。
 
 文章:
 {content}
 """
         )
         chain = prompt | self.model | StrOutputParser()
-        post = chain.invoke({"content": state.chunks[-1]})
+        post = chain.invoke(
+            {
+                "content": state.chunks[-1],
+                "min_chars": LangChainConfig.POST_MIN_CHARS,
+                "max_chars": LangChainConfig.POST_MAX_CHARS,
+            }
+        )
         logger.debug(f"Generated post: {post}")
         return {"posts": [post], "trial_count": state.trial_count + 1}
+
+    def _count_chars(self, text: str) -> int:
+        """全角と半角を区別して文字数をカウント"""
+        return sum(2 if ord(char) > 127 or ord(char) == 0x2212 else 1 for char in text)
 
     def rule_check_node(self, state: State) -> dict[str, Any]:
         logger.info("Checking post rules")
         post = state.posts[-1]
-
-        # 全角と半角を区別してカウントする
-        def count_chars(text: str) -> int:
-            count = 0
-            for char in text:
-                if ord(char) > 127 or ord(char) == 0x2212:  # 全角文字とマイナス記号
-                    count += 2
-                else:
-                    count += 1
-            return count
-
-        char_count = count_chars(post)
-        is_valid = 240 <= char_count <= 280
-        reason = f"文字数: 半角{char_count}文字。" + (
-            "OK" if is_valid else "文字数制限(全角で120-140文字)を満たしていません。"
+        char_count = self._count_chars(post)
+        is_valid = (
+            LangChainConfig.POST_MIN_CHARS * 2
+            <= char_count
+            <= LangChainConfig.POST_MAX_CHARS * 2
+        )
+        reason = f"文字数: 半角{char_count}文字" + (
+            "OK"
+            if is_valid
+            else f"文字数制限(全角で{LangChainConfig.POST_MIN_CHARS}-{LangChainConfig.POST_MAX_CHARS}文字)を満たしていません。"
         )
 
         logger.info(f"Rule check result: {is_valid}, Reason: {reason}")
@@ -123,7 +142,9 @@ class LangChainHandler:
 
         workflow.add_conditional_edges(
             "rule_check",
-            lambda state: state.current_judge or state.trial_count >= 3,
+            lambda state: (
+                state.current_judge or state.trial_count >= LangChainConfig.MAX_TRIALS
+            ),
             {True: END, False: "post_generate"},
         )
 
