@@ -1,5 +1,6 @@
 name: x_posting_bot
 on:
+  workflow_dispatch:
   schedule:
     # 日本時間の6時から22時
     - cron: "0 21-23 * * *"
