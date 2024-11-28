@@ -42,8 +42,8 @@ class NotionHandler:
             "filter": {
                 "and": [
                     {
-                        "property": "サマリ不要",
-                        "checkbox": {"equals": False},
+                        "property": "サマリ対象",
+                        "checkbox": {"equals": True},
                     },
                     {
                         "timestamp": "created_time",
