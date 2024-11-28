@@ -70,32 +70,17 @@ class NotionHandler:
         yesterday = now - datetime.timedelta(days=1)
         week_ago = now - datetime.timedelta(days=7)
 
-        yesterday_data = []
-        week_data = []
-        month_data = []
+        weights = []
 
         for data in notion_data_list:
             if data.created_time >= yesterday:
-                yesterday_data.append(data)
+                weights.append(0.6)
             elif data.created_time >= week_ago:
-                week_data.append(data)
+                weights.append(0.2)
             else:
-                month_data.append(data)
+                weights.append(0.2)
 
-        period_weights = [0.6, 0.2, 0.2]
-        period_data = [yesterday_data, week_data, month_data]
-
-        valid_periods = [
-            (data, weight) for data, weight in zip(period_data, period_weights) if data
-        ]
-        if not valid_periods:
-            raise ValueError("No valid data found in the specified time periods")
-
-        selected_period_data, _ = random.choices(
-            valid_periods, weights=[w for _, w in valid_periods], k=1
-        )[0]
-
-        return random.choice(selected_period_data)
+        return random.choices(notion_data_list, weights=weights, k=1)[0]
 
     def get_page_content(self, page_id: str) -> str:
         os.environ["NOTION_TOKEN"] = self.api_key
