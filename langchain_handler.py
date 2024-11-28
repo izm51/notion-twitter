@@ -37,7 +37,7 @@ class LangChainConfig:
     TEMPERATURE = 0.5
     BLOCK_MIN_CHARS = 300
     BLOCK_MAX_CHARS = 600
-    POST_MIN_CHARS = 120
+    POST_MIN_CHARS = 110
     POST_MAX_CHARS = 140
     MAX_TRIALS = 3
 
