@@ -160,6 +160,7 @@ class LangChainHandler:
         workflow.set_entry_point("block_selection")
         workflow.add_edge("block_selection", "post_generate")
         workflow.add_edge("post_generate", "rule_check")
+        workflow.add_edge("adjust_post", "rule_check")
 
         workflow.add_conditional_edges(
             "rule_check",
