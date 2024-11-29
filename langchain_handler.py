@@ -127,6 +127,26 @@ class LangChainHandler:
         logger.info(f"Rule check result: {is_valid}, Reason: {reason}")
         return {"current_judge": is_valid, "judgement_reason": reason}
 
+    def adjust_post_length_node(self, state: State) -> dict[str, Any]:
+        logger.info("Arranging post length")
+        prompt = ChatPromptTemplate.from_template(
+            """次の文章を{min_chars}文字以上{max_chars}文字以内に調整してください。
+
+文章:
+{content}
+"""
+        )
+        chain = prompt | self.model | StrOutputParser()
+        post = chain.invoke(
+            {
+                "content": state.posts[-1],
+                "min_chars": LangChainConfig.POST_MIN_CHARS,
+                "max_chars": LangChainConfig.POST_MAX_CHARS,
+            }
+        )
+        logger.debug(f"Arranged post: {post}")
+        return {"posts": [post]}
+
     def run_workflow(self, content: str) -> str:
         logger.info("Starting workflow")
         self.state = State(content=content)
@@ -135,6 +155,7 @@ class LangChainHandler:
         workflow.add_node("block_selection", self.block_selection_node)
         workflow.add_node("post_generate", self.post_generate_node)
         workflow.add_node("rule_check", self.rule_check_node)
+        workflow.add_node("adjust_post", self.adjust_post_length_node)
 
         workflow.set_entry_point("block_selection")
         workflow.add_edge("block_selection", "post_generate")
@@ -145,7 +166,7 @@ class LangChainHandler:
             lambda state: (
                 state.current_judge or state.trial_count >= LangChainConfig.MAX_TRIALS
             ),
-            {True: END, False: "post_generate"},
+            {True: END, False: "adjust_post"},
         )
 
         compiled = workflow.compile()
