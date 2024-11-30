@@ -135,8 +135,13 @@ class LangChainHandler:
         logger.info("Arranging post length")
         post = state.posts[-1]
         char_count = self._count_chars(post)
+        if char_count < LangChainConfig.POST_MIN_CHARS * 2:
+            message = f"全角{LangChainConfig.POST_MIN_CHARS}文字以上になるようもっと長くしてください。"
+        else:
+            message = f"全角{LangChainConfig.POST_MAX_CHARS}文字以内になるよう短くしてください。"
+
         prompt = ChatPromptTemplate.from_template(
-            """次の文章は半角{char_count}文字です。全角{min_chars}文字以上{max_chars}文字以内になるよう調整してください。
+            """次の文章を{message}
 
 文章:
 {content}
@@ -146,9 +151,7 @@ class LangChainHandler:
         post = chain.invoke(
             {
                 "content": post,
-                "char_count": char_count,
-                "min_chars": LangChainConfig.POST_MIN_CHARS,
-                "max_chars": LangChainConfig.POST_MAX_CHARS,
+                "message": message,
             }
         )
         logger.debug(f"Arranged post: {post}")
