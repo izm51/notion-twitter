@@ -107,7 +107,7 @@ class LangChainHandler:
             }
         )
         logger.debug(f"Generated post: {post}")
-        return {"posts": [post]
+        return {"posts": [post]}
 
     def _count_chars(self, text: str) -> int:
         """全角と半角を区別して文字数をカウント"""
@@ -149,7 +149,7 @@ class LangChainHandler:
             }
         )
         logger.debug(f"Arranged post: {post}")
-        return {"posts": [post], "trial_count": state.trial_count + 1}}
+        return {"posts": [post], "trial_count": state.trial_count + 1}
 
     def run_workflow(self, content: str) -> str:
         logger.info("Starting workflow")
