@@ -107,7 +107,7 @@ class LangChainHandler:
             }
         )
         logger.debug(f"Generated post: {post}")
-        return {"posts": [post], "trial_count": state.trial_count + 1}
+        return {"posts": [post]
 
     def _count_chars(self, text: str) -> int:
         """全角と半角を区別して文字数をカウント"""
@@ -134,7 +134,7 @@ class LangChainHandler:
     def adjust_post_length_node(self, state: State) -> dict[str, Any]:
         logger.info("Arranging post length")
         prompt = ChatPromptTemplate.from_template(
-            """次の文章を{min_chars}文字以上{max_chars}文字以内に調整してください。
+            """次の文章を全角{min_chars}文字以上{max_chars}文字以内に調整してください。
 
 文章:
 {content}
@@ -149,7 +149,7 @@ class LangChainHandler:
             }
         )
         logger.debug(f"Arranged post: {post}")
-        return {"posts": [post]}
+        return {"posts": [post], "trial_count": state.trial_count + 1}}
 
     def run_workflow(self, content: str) -> str:
         logger.info("Starting workflow")
