@@ -133,8 +133,10 @@ class LangChainHandler:
 
     def adjust_post_length_node(self, state: State) -> dict[str, Any]:
         logger.info("Arranging post length")
+        post = state.posts[-1]
+        char_count = self._count_chars(post)
         prompt = ChatPromptTemplate.from_template(
-            """次の文章を全角{min_chars}文字以上{max_chars}文字以内に調整してください。
+            """次の文章は半角{char_count}文字です。全角{min_chars}文字以上{max_chars}文字以内になるよう調整してください。
 
 文章:
 {content}
@@ -143,7 +145,8 @@ class LangChainHandler:
         chain = prompt | self.model | StrOutputParser()
         post = chain.invoke(
             {
-                "content": state.posts[-1],
+                "content": post,
+                "char_count": char_count,
                 "min_chars": LangChainConfig.POST_MIN_CHARS,
                 "max_chars": LangChainConfig.POST_MAX_CHARS,
             }
