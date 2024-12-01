@@ -136,9 +136,9 @@ class LangChainHandler:
         post = state.posts[-1]
         char_count = self._count_chars(post)
         if char_count < LangChainConfig.POST_MIN_CHARS * 2:
-            message = f"全角{LangChainConfig.POST_MIN_CHARS}文字以上になるようもっと長くしてください。"
+            message = f"全角{LangChainConfig.POST_MIN_CHARS}文字以上{LangChainConfig.POST_MAX_CHARS}文字以内になるようもっと長くしてください。"
         else:
-            message = f"全角{LangChainConfig.POST_MAX_CHARS}文字以内になるよう短くしてください。"
+            message = f"全角{LangChainConfig.POST_MIN_CHARS}文字以上{LangChainConfig.POST_MAX_CHARS}文字以内になるよう短くしてください。"
 
         prompt = ChatPromptTemplate.from_template(
             """次の文章は全角{char_count}文字です。{message}
