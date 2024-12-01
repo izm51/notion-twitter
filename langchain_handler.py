@@ -141,7 +141,7 @@ class LangChainHandler:
             message = f"全角{LangChainConfig.POST_MAX_CHARS}文字以内になるよう短くしてください。"
 
         prompt = ChatPromptTemplate.from_template(
-            """次の文章を{message}
+            """次の文章は全角{char_count}文字です。{message}
 
 文章:
 {content}
@@ -151,6 +151,7 @@ class LangChainHandler:
         post = chain.invoke(
             {
                 "content": post,
+                "char_count": char_count / 2.0,
                 "message": message,
             }
         )
@@ -186,7 +187,7 @@ class LangChainHandler:
             result = compiled.invoke(self.state)
             logger.info("Workflow completed successfully")
             if not result["current_judge"]:
-                logger.error(f"Post validation failed: {result.judgement_reason}")
+                logger.error(f"Post validation failed: {result['judgement_reason']}")
                 raise Exception(
                     f"current_judge: {result['current_judge']}, judgement_reason: {result['judgement_reason']}"
                 )
