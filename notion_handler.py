@@ -18,9 +18,9 @@ class NotionConfig:
     DAYS_LOOKBACK = 365
 
     # 重み付けの設定
-    WEIGHT_YESTERDAY = 0.6
-    WEIGHT_WEEK = 0.2
-    WEIGHT_OLDER = 0.2
+    WEIGHT_YESTERDAY = 0.5
+    WEIGHT_WEEK = 0.25
+    WEIGHT_OLDER = 0.25
 
 
 class NotionHandler:
@@ -76,20 +76,41 @@ class NotionHandler:
             notion_data_list.append(notion_data)
         return notion_data_list
 
-    def _calculate_weight(self, data: NotionData) -> float:
+    def select_notion_data(self, notion_data_list: list[NotionData]) -> NotionData:
         now = datetime.now(timezone.utc)
         yesterday = now - timedelta(days=1)
         week_ago = now - timedelta(days=7)
 
-        if data.created_time >= yesterday:
-            return NotionConfig.WEIGHT_YESTERDAY
-        elif data.created_time >= week_ago:
-            return NotionConfig.WEIGHT_WEEK
-        return NotionConfig.WEIGHT_OLDER
+        yesterday_data = []
+        week_data = []
+        month_data = []
 
-    def select_notion_data(self, notion_data_list: list[NotionData]) -> NotionData:
-        weights = [self._calculate_weight(data) for data in notion_data_list]
-        return random.choices(notion_data_list, weights=weights, k=1)[0]
+        for data in notion_data_list:
+            if data.created_time >= yesterday:
+                yesterday_data.append(data)
+            elif data.created_time >= week_ago:
+                week_data.append(data)
+            else:
+                month_data.append(data)
+
+        period_weights = [
+            NotionConfig.WEIGHT_YESTERDAY,
+            NotionConfig.WEIGHT_WEEK,
+            NotionConfig.WEIGHT_OLDER,
+        ]
+        period_data = [yesterday_data, week_data, month_data]
+
+        valid_periods = [
+            (data, weight) for data, weight in zip(period_data, period_weights) if data
+        ]
+        if not valid_periods:
+            raise ValueError("No valid data found in the specified time periods")
+
+        selected_period_data, _ = random.choices(
+            valid_periods, weights=[w for _, w in valid_periods], k=1
+        )[0]
+
+        return random.choice(selected_period_data)
 
     def get_page_content(self, page_id: str) -> str:
         os.environ["NOTION_TOKEN"] = self.api_key
